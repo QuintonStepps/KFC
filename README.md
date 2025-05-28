@@ -1,3 +1,4 @@
+All the logic is in KFC.h
 ---
 title: "KFC: Kernel-Free Concurrency"
 author: Devin J. Pohly

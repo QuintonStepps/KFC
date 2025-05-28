@@ -10,11 +10,11 @@
 
 static int inited = 0;
 static int nThreads = 0;
-static ucontext_t bingo[1024];
-#define banana long
+static ucontext_t contextArray[1024];
+
 
 int currentId = 0;
- ucontext_t schoolhouserock;
+ucontext_t Schedualer;
 static queue_t readyq;
 queue_t waitq[1024];
 void* datarack [1024];
@@ -43,17 +43,17 @@ __caddr_t* stacker;
     
     
         if(readyq.size < 1){
-          //  DPRINTF("Bananan\n\n");
+      
             exit(0);
         }
-        int slingos  = queue_dequeue(&readyq);
+        int nextId  = queue_dequeue(&readyq);
         if(queue_peek(&readyq) != NULL){
-        //    DPRINTF("Peeking: %d\n", queue_peek(&queue) - 1);
+    
         }
-        slingos--;
-        //DPRINTF("current THread: %d\n-----------------\n", slingos);
-        ucontext_t swtich = bingo[slingos];
-        currentId = slingos;
+        nextId--;
+       
+        ucontext_t swtich = contextArray[nextId];
+        currentId = nextId;
         
 
       
@@ -67,26 +67,20 @@ kfc_init(int kthreads, int quantum_us)
 {
 	assert(!inited);
     queue_init(&readyq);
-    //getcontext(&bingo[0]);
+    
     caddr_t stack_base = malloc(KFC_DEF_STACK_SIZE);
-    //bingo[0].uc_stack.ss_sp = stack_base;
-    //bingo[0].uc_stack.ss_size = KFC_DEF_STACK_SIZE;
-   // bingo[0].uc_link = &schoolhouserock;
-    //VALGRIND_STACK_REGISTER(stack_base, KFC_DEF_STACK_SIZE + stack_base);
-    //stacker = &stack_base;
-    //free(stack_base);
-    //stack_base = malloc(KFC_DEF_STACK_SIZE);
-    schoolhouserock.uc_stack.ss_sp = stack_base;
-    schoolhouserock.uc_stack.ss_size = KFC_DEF_STACK_SIZE;
+    
+    Schedualer.uc_stack.ss_sp = stack_base;
+    Schedualer.uc_stack.ss_size = KFC_DEF_STACK_SIZE;
 
     
     VALGRIND_STACK_REGISTER(stack_base, KFC_DEF_STACK_SIZE + stack_base);
-    getcontext(&schoolhouserock);
-    makecontext(&schoolhouserock, (void (*)())schedular,0);
+    getcontext(&Schedualer);
+    makecontext(&Schedualer, (void (*)())schedular,0);
 	inited = 1;
 
     
-    //free(stack_base);
+    
 	return 0;
 }
 
@@ -108,7 +102,7 @@ kfc_init(int kthreads, int quantum_us)
 void
 kfc_teardown(void)
 {
-    //free(&schoolhouserock.uc_stack.ss_size);
+    
     for(int i = 0; i <= nThreads; i++){
         queue_destroy(&waitq[i]);
         if(madeMemory[i] == 1){
@@ -117,8 +111,8 @@ kfc_teardown(void)
     }
     queue_destroy(&readyq);
 	assert(inited);
-    free(schoolhouserock.uc_stack.ss_sp);
-    //free(bingo[0].uc_stack.ss_sp);
+    free(Schedualer.uc_stack.ss_sp);
+    
 
 	inited = 0;
 }
@@ -146,7 +140,7 @@ int kfc_create(tid_t *ptid, void *(*start_func)(void *), void *arg,
     int current = currentId;  
     *ptid = ++nThreads;
     currentId = nThreads;
-    //DPRINTF("Next Thread: %d\n", currentId);
+    
     if (stack_size == 0) {
         stack_size = KFC_DEF_STACK_SIZE;
     }
@@ -160,13 +154,13 @@ int kfc_create(tid_t *ptid, void *(*start_func)(void *), void *arg,
     queue_init(&waitq[next]);
     bingo[next].uc_stack.ss_sp = stack_base;  
     bingo[next].uc_stack.ss_size = stack_size;
-    bingo[next].uc_link = &schoolhouserock;
+    bingo[next].uc_link = &Schedualer;
     //queueing new thread
     queue_enqueue(&readyq, currentId + 1);
   
     getcontext(&bingo[next]);
 
-    makecontext(&bingo[next], lady_and_the_trampoline, 2, start_func, (banana)arg);
+    makecontext(&bingo[next], lady_and_the_trampoline, 2, start_func, (long)arg);
         currentId = current;
     assert(inited);
     return 0;
@@ -183,12 +177,12 @@ kfc_exit(void *ret)
 {
     datarack[currentId] = ret;
     for(int i = 0; i < waitq[currentId].size; i++){
-      //  DPRINTF("OUt of wait\n");
+      
         queue_enqueue(&readyq, queue_dequeue(&waitq[currentId]));
     }
-    //DPRINTF("What thread has exited: %d\n", currentId);
+    
     hasExited[currentId] = 1;
-    setcontext(&schoolhouserock);
+    setcontext(&Schedualer);
     
 	assert(inited);
 }
@@ -215,13 +209,10 @@ kfc_join(tid_t tid, void **pret)
     //DPRINTF("Oragne\n");
     }
     else{
-        //DPRINTF("I am block\n");
-        //DPRINTF("The current Thread: %d\n", currentId);
+
         queue_enqueue(&waitq[(int)tid], (void*) currentId + 1);
-        //int temp = queue_peek(&waitq[tid]);
-        //DPRINTF("In the Queue: %d\n",temp);
-        //DPRINTF("What thread am I waiting on: %d\n", tid);
-        swapcontext(&bingo[currentId],&schoolhouserock);
+  
+        swapcontext(&bingo[currentId],&Schedualer);
     }
     
     *pret = datarack[(int)tid];
@@ -252,10 +243,9 @@ kfc_self(void)
 void
 kfc_yield(void)
 {
-    //DPRINTF("Is the yeild\n");
-    //getcontext(&bingo[currentId]);
+
     queue_enqueue(&readyq, currentId + 1);
-    swapcontext(&bingo[currentId], &schoolhouserock);
+    swapcontext(&bingo[currentId], &Schedualer);
 	assert(inited);
 }
 
@@ -312,7 +302,7 @@ kfc_sem_wait(kfc_sem_t *sem)
 	sem->money--;
     if(sem->money < 0){
         queue_enqueue(&sem->bunger, (currentId + 1));
-        swapcontext(&bingo[currentId], &schoolhouserock);
+        swapcontext(&bingo[currentId], &Schedualer);
     }
 	assert(inited);
 	return 0;
